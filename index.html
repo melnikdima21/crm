@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Единое окно — CRM операторa</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+  <!-- Inter font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] },
+          colors: {
+            navy:    { 950: '#0A1628', 900: '#0F172A', 800: '#1E293B', 700: '#334155' },
+            emerald: { soft: '#D1FAE5', DEFAULT: '#10B981', deep: '#059669' },
+            rose:    { soft: '#FFE4E6', DEFAULT: '#F43F5E', muted: '#FCA5A5' },
+            slate:   { muted: '#94A3B8' },
+          },
+          boxShadow: {
+            card: '0 4px 40px rgba(0,0,0,0.45)',
+            glow: '0 0 24px rgba(16,185,129,0.35)',
+          },
+          keyframes: {
+            pulse2: { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.7 } },
+            fadeIn: { from: { opacity: 0, transform: 'translateY(8px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
+            spin:   { to: { transform: 'rotate(360deg)' } },
+          },
+          animation: {
+            pulse2: 'pulse2 2.2s ease-in-out infinite',
+            fadeIn: 'fadeIn 0.35s ease both',
+            spin:   'spin 0.8s linear infinite',
+          },
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; background: #0A1628; }
+
+    /* Overlay loader */
+    #loader {
+      position: fixed; inset: 0; z-index: 50;
+      background: rgba(10, 22, 40, 0.78);
+      backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      transition: opacity 0.25s;
+    }
+    #loader.hidden { opacity: 0; pointer-events: none; }
+
+    /* Card fade-in trigger */
+    .card-animate { animation: fadeIn 0.35s ease both; }
+
+    /* Tel button hover glow */
+    #btn-call:hover { box-shadow: 0 0 24px rgba(16,185,129,0.4); }
+
+    /* Action buttons */
+    .btn-action {
+      transition: transform 0.1s, box-shadow 0.2s;
+    }
+    .btn-action:active { transform: scale(0.97); }
+
+    /* Green pulse ring */
+    .pulse-ring {
+      animation: pulse2 2.2s ease-in-out infinite;
+    }
+
+    /* History textarea */
+    #history-text {
+      background: #0A1628;
+      border: 1px solid #334155;
+      color: #94A3B8;
+      resize: none;
+      scrollbar-width: thin;
+      scrollbar-color: #334155 transparent;
+    }
+
+    /* Operator input */
+    #operator-name {
+      background: #1E293B;
+      border: 1px solid #334155;
+      color: #E2E8F0;
+      outline: none;
+    }
+    #operator-name:focus { border-color: #10B981; box-shadow: 0 0 0 2px rgba(16,185,129,0.2); }
+  </style>
+</head>
+
+<body class="min-h-screen flex flex-col">
+
+  <!-- ══ LOADER ══ -->
+  <div id="loader">
+    <div class="flex flex-col items-center gap-4">
+      <div class="w-12 h-12 rounded-full border-4 border-slate-700 border-t-emerald-400"
+           style="animation: spin 0.8s linear infinite;"></div>
+      <p class="text-slate-400 text-sm tracking-wide">Загрузка клиента…</p>
+    </div>
+  </div>
+
+  <!-- ══ TOP BAR ══ -->
+  <header class="w-full px-4 py-3 flex items-center justify-between gap-4
+                 border-b border-slate-700/50 bg-navy-900/80 backdrop-blur sticky top-0 z-20">
+
+    <!-- Logo / Title -->
+    <div class="flex items-center gap-3 shrink-0">
+      <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+        <i class="fa-solid fa-box-archive text-emerald-400 text-sm"></i>
+      </div>
+      <div>
+        <p class="text-white font-bold text-sm leading-none tracking-tight">Единое окно</p>
+        <p class="text-slate-500 text-xs leading-none mt-0.5">Израиль → Молдова</p>
+      </div>
+    </div>
+
+    <!-- Operator name -->
+    <div class="flex items-center gap-2 flex-1 max-w-xs">
+      <i class="fa-solid fa-headset text-slate-500 text-sm shrink-0"></i>
+      <input id="operator-name"
+             type="text"
+             placeholder="Имя оператора…"
+             class="w-full text-sm rounded-lg px-3 py-1.5 transition-all" />
+    </div>
+
+    <!-- Counter -->
+    <div class="flex items-center gap-3 shrink-0">
+      <div class="text-right">
+        <p class="text-slate-500 text-xs leading-none">Обработано сегодня</p>
+        <p id="counter" class="text-emerald-400 font-black text-2xl leading-none mt-0.5">0</p>
+      </div>
+      <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+        <i class="fa-solid fa-check-double text-emerald-500 text-sm"></i>
+      </div>
+    </div>
+
+  </header>
+
+  <!-- ══ MAIN ══ -->
+  <main class="flex-1 flex items-start justify-center px-4 py-8 sm:py-12">
+
+    <!-- ── CLIENT CARD ── -->
+    <div id="client-card"
+         class="card-animate w-full max-w-lg bg-navy-800 rounded-2xl shadow-card overflow-hidden">
+
+      <!-- Card header stripe -->
+      <div class="h-1.5 w-full bg-gradient-to-r from-emerald-500 to-teal-400"></div>
+
+      <div class="p-6 sm:p-8 flex flex-col gap-6">
+
+        <!-- State: empty / done -->
+        <div id="state-done" class="hidden text-center py-10 flex flex-col items-center gap-4">
+          <div class="w-20 h-20 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto">
+            <i class="fa-solid fa-trophy text-emerald-400 text-4xl"></i>
+          </div>
+          <h2 class="text-white text-2xl font-black">Отличная работа!</h2>
+          <p class="text-slate-400 text-sm max-w-xs">Все контакты в базе обработаны. Можно отдохнуть ☕</p>
+        </div>
+
+        <!-- State: active client -->
+        <div id="state-client">
+
+          <!-- Client name -->
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-xl bg-slate-700 flex items-center justify-center shrink-0 mt-0.5">
+              <i class="fa-solid fa-user text-slate-400"></i>
+            </div>
+            <div>
+              <p class="text-slate-500 text-xs uppercase tracking-widest mb-0.5">Клиент</p>
+              <h1 id="client-name" class="text-white font-black text-2xl sm:text-3xl leading-tight">
+                — — —
+              </h1>
+            </div>
+          </div>
+
+          <!-- Phone button -->
+          <a id="btn-call" href="tel:" 
+             class="flex items-center justify-center gap-3
+                    bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20
+                    text-emerald-300 font-bold text-xl sm:text-2xl
+                    rounded-xl px-5 py-4 transition-all cursor-pointer select-all">
+            <div class="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-phone text-emerald-400 text-lg"></i>
+            </div>
+            <span id="client-phone">+_ ___ ___-__-__</span>
+          </a>
+
+          <!-- History -->
+          <div>
+            <div class="flex items-center gap-2 mb-2">
+              <i class="fa-solid fa-clock-rotate-left text-slate-500 text-sm"></i>
+              <p class="text-slate-500 text-xs uppercase tracking-widest">История заказов</p>
+            </div>
+            <textarea id="history-text"
+                      readonly rows="4"
+                      placeholder="История отправок клиента появится здесь…"
+                      class="w-full rounded-xl px-4 py-3 text-sm leading-relaxed transition-all">
+            </textarea>
+          </div>
+
+          <!-- Action buttons -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+
+            <!-- RED: phone off -->
+            <button id="btn-off"
+                    class="btn-action flex items-center justify-center gap-3
+                           bg-rose-soft border-2 border-rose-200 hover:bg-rose-100
+                           text-rose-600 font-black text-base sm:text-lg
+                           rounded-xl px-4 py-5 transition-all">
+              <i class="fa-solid fa-phone-slash text-xl"></i>
+              <span>Телефон<br>выключен</span>
+            </button>
+
+            <!-- GREEN: ready -->
+            <div class="relative">
+              <!-- Pulse ring behind button -->
+              <div class="pulse-ring absolute inset-0 rounded-xl bg-emerald-400/20 pointer-events-none"></div>
+              <button id="btn-ready"
+                      class="btn-action relative w-full flex items-center justify-center gap-3
+                             bg-emerald-soft border-2 border-emerald-300 hover:bg-emerald-100
+                             text-emerald-700 font-black text-base sm:text-lg
+                             rounded-xl px-4 py-5 transition-all">
+                <i class="fa-brands fa-telegram text-xl"></i>
+                <span>Клиент готов<br>→ Telegram</span>
+              </button>
+            </div>
+
+          </div><!-- /grid -->
+
+          <!-- Row index debug badge -->
+          <p class="text-center text-slate-700 text-xs mt-1">
+            строка в таблице: <span id="row-badge" class="font-mono">—</span>
+          </p>
+
+        </div><!-- /state-client -->
+
+      </div><!-- /card body -->
+    </div><!-- /card -->
+
+  </main>
+
+  <!-- ══ JAVASCRIPT ══ -->
+  <script>
+  // ─────────────────────────────────────────────────────────
+  //  CONFIG — вставь свой URL после развёртывания Web App
+  // ─────────────────────────────────────────────────────────
+  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzEehMGqnsVyHm4iFlSh9rpjS_GwdSKUUE38TxKriWPeEbhUjzCtuzZn7JElz7WR8rpzw/exec";
+
+  // ─────────────────────────────────────────────────────────
+  //  STATE
+  // ─────────────────────────────────────────────────────────
+  let currentRow   = null;   // rowIndex текущего клиента
+  let currentName  = "";
+  let currentPhone = "";
+
+  // Счётчик за сегодня (сбрасывается в полночь через ключ даты)
+  const TODAY_KEY = "crm_date_" + new Date().toLocaleDateString("ru-RU");
+  function getCounter() { return parseInt(localStorage.getItem(TODAY_KEY) || "0", 10); }
+  function incCounter() {
+    const v = getCounter() + 1;
+    localStorage.setItem(TODAY_KEY, v);
+    document.getElementById("counter").textContent = v;
+  }
+  document.getElementById("counter").textContent = getCounter();
+
+  // ─────────────────────────────────────────────────────────
+  //  OPERATOR NAME — localStorage
+  // ─────────────────────────────────────────────────────────
+  const operatorInput = document.getElementById("operator-name");
+  operatorInput.value = localStorage.getItem("crm_operator") || "";
+  operatorInput.addEventListener("blur", () => {
+    const val = operatorInput.value.trim();
+    if (val) localStorage.setItem("crm_operator", val);
+  });
+
+  function getOperator() {
+    const name = operatorInput.value.trim();
+    if (!name) {
+      operatorInput.focus();
+      operatorInput.style.borderColor = "#F43F5E";
+      setTimeout(() => { operatorInput.style.borderColor = ""; }, 2000);
+      return null;
+    }
+    return name;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  LOADER
+  // ─────────────────────────────────────────────────────────
+  function showLoader(msg = "Загрузка клиента…") {
+    const loader = document.getElementById("loader");
+    loader.querySelector("p").textContent = msg;
+    loader.classList.remove("hidden");
+  }
+  function hideLoader() {
+    document.getElementById("loader").classList.add("hidden");
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  RENDER CLIENT
+  // ─────────────────────────────────────────────────────────
+  function renderClient(data) {
+    currentRow   = data.rowIndex;
+    currentName  = data.name  || "—";
+    currentPhone = String(data.phone || "").trim();
+
+    document.getElementById("client-name").textContent  = currentName;
+    document.getElementById("client-phone").textContent = currentPhone || "Нет телефона";
+    document.getElementById("btn-call").href = currentPhone ? "tel:" + currentPhone : "#";
+    document.getElementById("history-text").value = data.history || "История отсутствует";
+    document.getElementById("row-badge").textContent = currentRow;
+
+    // Show client state
+    document.getElementById("state-client").classList.remove("hidden");
+    document.getElementById("state-done").classList.add("hidden");
+
+    // Re-trigger fade-in
+    const card = document.getElementById("client-card");
+    card.classList.remove("card-animate");
+    void card.offsetWidth; // reflow
+    card.classList.add("card-animate");
+  }
+
+  function renderDone() {
+    document.getElementById("state-client").classList.add("hidden");
+    document.getElementById("state-done").classList.remove("hidden");
+    currentRow = null;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  GET — fetch next client
+  // ─────────────────────────────────────────────────────────
+  async function fetchNextClient() {
+    showLoader("Загрузка клиента…");
+    try {
+      const res  = await fetch(WEB_APP_URL, { redirect: "follow" });
+      const data = await res.json();
+
+      if (data.found) {
+        renderClient(data);
+      } else {
+        renderDone();
+      }
+    } catch (err) {
+      console.error("GET error:", err);
+      alert("Ошибка загрузки. Проверь URL в WEB_APP_URL и открой консоль.");
+    } finally {
+      hideLoader();
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  POST — submit call result
+  // ─────────────────────────────────────────────────────────
+  async function submitStatus(status) {
+    if (!currentRow) return;
+
+    const operator = getOperator();
+    if (!operator) return;
+
+    const label = status === "выключен" ? "Сохранение…" : "Отправка в Telegram…";
+    showLoader(label);
+
+    try {
+      const res  = await fetch(WEB_APP_URL, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          rowIndex:     currentRow,
+          status:       status,
+          operatorName: operator,
+        }),
+        redirect: "follow",
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        incCounter();
+        await fetchNextClient(); // автоматически загружаем следующего
+      } else {
+        alert("Ошибка от сервера: " + (data.message || "неизвестно"));
+        hideLoader();
+      }
+    } catch (err) {
+      console.error("POST error:", err);
+      alert("Ошибка отправки. Открой консоль для деталей.");
+      hideLoader();
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  BUTTONS
+  // ─────────────────────────────────────────────────────────
+  document.getElementById("btn-off").addEventListener("click", () => {
+    submitStatus("выключен");
+  });
+
+  document.getElementById("btn-ready").addEventListener("click", () => {
+    submitStatus("готов");
+  });
+
+  // ─────────────────────────────────────────────────────────
+  //  INIT
+  // ─────────────────────────────────────────────────────────
+  fetchNextClient();
+  </script>
+
+</body>
+</html>
